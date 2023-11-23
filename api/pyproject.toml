@@ -1,0 +1,25 @@
+[tool.poetry]
+name = "key-battler"
+version = "0.1.0"
+description = "key-battler"
+authors = ["poslam"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+fastapi = "^0.103.2"
+sqlalchemy = "^2.0.21"
+alembic = "^1.12.0"
+python-dotenv = "^1.0.0"
+asyncpg = "^0.28.0"
+uvicorn = "^0.23.2"
+autopep8 = "^2.0.4"
+httpx = "^0.25.0"
+greenlet = "^3.0.0"
+pyjwt = "^2.8.0"
+werkzeug = "^3.0.1"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
