@@ -1,15 +1,6 @@
 from database.database import base
-from sqlalchemy import (
-    DATE,
-    TEXT,
-    TIME,
-    TIMESTAMP,
-    Boolean,
-    Column,
-    ForeignKey,
-    Integer,
-    String,
-)
+from sqlalchemy import (DATE, TEXT, TIME, TIMESTAMP, Boolean, Column,
+                        ForeignKey, Integer, String)
 
 
 class Roles(base):
@@ -60,6 +51,19 @@ class Users(base):
     Active = Column(Boolean, default=True)
 
 
+class Tokens(base):
+    __tablename__ = "tokens"
+    
+    ID = Column(Integer, primary_key=True)
+    Token = Column(TEXT)
+    
+    CreateTime = Column(TIMESTAMP)
+    DeletionTime = Column(TIMESTAMP)
+    
+    Active = Column(Boolean)
+    UserID = Column(ForeignKey(Users.ID))
+
+
 class Airports(base):
     __tablename__ = "airports"
 
@@ -108,7 +112,7 @@ class Schedules(base):
 
     FlightNumber = Column(TEXT)
     EconomyPrice = Column(Integer)
-    
+
     Confirmed = Column(Integer)
 
 
@@ -120,7 +124,7 @@ class Tickets(base):
     UserID = Column(ForeignKey(Users.ID))
     ScheduleID = Column(ForeignKey(Schedules.ID))
     CabinTypeID = Column(ForeignKey(CabinTypes.ID))
-    
+
     Firstname = Column(TEXT)
     Lastname = Column(TEXT)
 
@@ -128,7 +132,7 @@ class Tickets(base):
     PassportNumber = Column(TEXT)
     PassportCountryID = Column(ForeignKey(Countries.ID))
     BookingReference = Column(TEXT)
-    
+
     Confirmed = Column(Integer)
 
 
@@ -153,5 +157,5 @@ class AmenitiesTickets(base):
 
     AmenitiesID = Column(ForeignKey(Amenities.ID), primary_key=True)
     TicketID = Column(ForeignKey(Tickets.ID), primary_key=True)
-    
+
     Price = Column(Integer)
