@@ -1,5 +1,5 @@
-from datetime import datetime, timedelta
+from datetime import datetime
 
 
 def time():
-    return datetime.utcnow()+timedelta(hours=10)
+    return datetime.utcnow()
