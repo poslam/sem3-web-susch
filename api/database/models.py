@@ -5,24 +5,27 @@ from sqlalchemy import (DATE, TEXT, TIME, TIMESTAMP, Boolean, Column,
 
 class Roles(base):
     __tablename__ = "roles"
+    
     ID = Column(Integer, primary_key=True)
     Title = Column(TEXT)
 
 
 class CabinTypes(base):
     __tablename__ = "cabintypes"
+    
     ID = Column(Integer, primary_key=True)
     Name = Column(TEXT)
 
 
 class Countries(base):
     __tablename__ = "countries"
+    
     ID = Column(Integer, primary_key=True)
     Name = Column(TEXT)
 
 
 class Offices(base):
-    __tablename__ = "client"
+    __tablename__ = "offices"
 
     ID = Column(Integer, primary_key=True)
 
@@ -44,12 +47,22 @@ class Users(base):
     Email = Column(TEXT)
     Password = Column(TEXT)
 
-    Firstname = Column(TEXT)
-    Lastname = Column(TEXT)
-    Birthdate = Column(TIMESTAMP)
+    FirstName = Column(TEXT)
+    LastName = Column(TEXT)
+    Birthdate = Column(DATE)
 
     Active = Column(Boolean, default=True)
 
+
+class Logs(base):
+    __tablename__ = "logs"
+    
+    ID = Column(Integer, primary_key=True)
+    
+    Error = Column(TEXT)
+    UserID = Column(ForeignKey(Users.ID))
+    Time = Column(TIMESTAMP)
+    
 
 class Tokens(base):
     __tablename__ = "tokens"

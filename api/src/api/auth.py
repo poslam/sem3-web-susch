@@ -1,14 +1,13 @@
-from datetime import datetime, timedelta
+from datetime import timedelta
+from uuid import uuid4
 
-from config import ALGORITHM, AUTH_TOKEN_LIFE, SECRET_AUTH
+from config import AUTH_TOKEN_LIFE
 from database.database import get_session
 from database.models import Roles, Tokens, Users
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
-from jwt import decode, encode
-from sqlalchemy import delete, insert, select, update
+from sqlalchemy import insert, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.utils import time
-from werkzeug.security import check_password_hash, generate_password_hash
 
 auth_router = APIRouter()
 
@@ -24,6 +23,8 @@ async def type_required(types: list,  auth: str = Header(None),
 
     if token == None:
         raise HTTPException(status_code=401, detail="token is invalid")
+
+    token = token[0]
 
     if time() - timedelta(hours=int(AUTH_TOKEN_LIFE)) > token.CreateTime:
 
@@ -46,15 +47,21 @@ async def type_required(types: list,  auth: str = Header(None),
 
     role: Roles = await session.get(Roles, user.RoleID)
 
-    if role.Title not in types:
-        raise HTTPException(status_code=400, detail="not allowed")
+    if types != []:
+        if role.Title not in types:
+            raise HTTPException(status_code=400, detail="not allowed")
 
     return user
 
 
 async def login_required(auth: str = Header(None),
                          session: AsyncSession = Depends(get_session)):
-    return await type_required(["Users"], auth, session)
+    return await type_required(["User"], auth, session)
+
+
+async def user_required(auth: str = Header(None),
+                        session: AsyncSession = Depends(get_session)):
+    return await type_required([], auth, session)
 
 
 async def admin_required(auth: str = Header(None),
@@ -81,8 +88,12 @@ async def login(request: Request,
     if user == None:
         raise HTTPException(status_code=400, detail='user not found')
 
-    if not check_password_hash(user.Password, password):
+    user = user[0]
+
+    if user.Password != password:
         raise HTTPException(status_code=400, detail="wrong auth data")
+
+    role = (await session.get(Roles, user.RoleID)).Title
 
     token: Tokens = (await session.execute(
         select(Tokens)
@@ -94,6 +105,8 @@ async def login(request: Request,
         pass
 
     else:
+        token = token[0]
+
         if time() - timedelta(hours=int(AUTH_TOKEN_LIFE)) > token.CreateTime:
 
             await session.execute(
@@ -108,14 +121,10 @@ async def login(request: Request,
 
         else:
             return {"token": token.Token,
-                    "type": user["type"]
+                    "type": role
                     }
 
-    token = encode(
-        {"id": user.ID, "expired": str(
-            time() + timedelta(hours=int(AUTH_TOKEN_LIFE)))},
-        SECRET_AUTH,
-    )
+    token = uuid4()
 
     token_insert = {
         "Token": token,
@@ -130,12 +139,12 @@ async def login(request: Request,
     await session.commit()
 
     return {"token": token,
-            "type": user["type"]
+            "type": role
             }
 
 
 @auth_router.post("/logout")
-async def logout(request: Request, user: Users = Depends(login_required),
+async def logout(user: Users = Depends(user_required),
                  session: AsyncSession = Depends(get_session)):
 
     await session.execute(
@@ -148,5 +157,5 @@ async def logout(request: Request, user: Users = Depends(login_required),
         })
     )
     await session.commit()
-    
+
     return {"detail": "logout success"}
