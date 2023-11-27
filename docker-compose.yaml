@@ -1,21 +1,37 @@
 services:
 
     database:
-        image: postgres:16
-        ports: 
-            - 5432:5432
+        image: mysql
+        restart: always
         environment:
-            POSTGRES_HOST_AUTH_METHOD: trust
+            MYSQL_DATABASE: web-susch
+            MYSQL_USER: mysql
+            MYSQL_PASSWORD: 119900
+            MYSQL_ROOT_PASSWORD: 119900
+        volumes:
+            - ./dumps:/docker-entrypoint-initdb.d
+            - data:/var/lib/mysql
+        ports:
+            - 3307:3306
+        command: --default-authentication-plugin=mysql_native_password
+                 
 
     api:
         links:
             - database
-
-        env_file:
-            - .env
-
         image: api
-        ports:
-            - 8002:8002
-        build: ./api
         restart: always
+        ports:
+            - 8004:8004
+        environment:
+            DB_NAME: web-susch
+            DB_PORT: 3306
+            DB_PASS: 119900
+            DB_USER: root
+            DB_HOST: database
+            AUTH_TOKEN_LIFE: 22
+        build: ./api
+
+volumes:
+    data:
+        driver: local
