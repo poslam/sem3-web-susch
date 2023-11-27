@@ -10,13 +10,13 @@ python = "^3.11"
 fastapi = "^0.103.2"
 sqlalchemy = "^2.0.21"
 python-dotenv = "^1.0.0"
-asyncpg = "^0.28.0"
 uvicorn = "^0.23.2"
 autopep8 = "^2.0.4"
 greenlet = "^3.0.0"
 pyjwt = "^2.8.0"
 werkzeug = "^3.0.1"
 aiomysql = "^0.2.0"
+cryptography = "^41.0.5"
 
 
 [build-system]
