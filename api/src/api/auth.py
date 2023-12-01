@@ -56,12 +56,12 @@ async def type_required(types: list,  auth: str = Header(None),
 
 async def login_required(auth: str = Header(None),
                          session: AsyncSession = Depends(get_session)):
-    return await type_required(["User"], auth, session)
+    return await type_required([], auth, session)
 
 
 async def user_required(auth: str = Header(None),
                         session: AsyncSession = Depends(get_session)):
-    return await type_required([], auth, session)
+    return await type_required(["User"], auth, session)
 
 
 async def admin_required(auth: str = Header(None),
