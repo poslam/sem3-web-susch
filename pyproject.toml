@@ -17,6 +17,7 @@ pyjwt = "^2.8.0"
 werkzeug = "^3.0.1"
 aiomysql = "^0.2.0"
 cryptography = "^41.0.5"
+python-multipart = "^0.0.6"
 
 
 [build-system]
