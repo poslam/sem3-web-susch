@@ -1,5 +1,5 @@
 from database.database import base
-from sqlalchemy import (DATE, TEXT, TIME, TIMESTAMP, Boolean, Column,
+from sqlalchemy import (DATE, TEXT, TIME, TIMESTAMP, Boolean, Column, Float,
                         ForeignKey, Integer, String)
 
 
@@ -124,7 +124,7 @@ class Schedules(base):
     RouteID = Column(ForeignKey(Routes.ID))
 
     FlightNumber = Column(TEXT)
-    EconomyPrice = Column(Integer)
+    EconomyPrice = Column(Float)
 
     Confirmed = Column(Integer)
 

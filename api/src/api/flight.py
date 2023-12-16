@@ -152,6 +152,11 @@ async def import_flights_from_txt(file: UploadFile = File(...),
 
         data = line.split(',')
 
+        if "OK" in data[8]:
+            data[8] = 1
+        else:
+            data[8] = 0
+
         if len(data) == 9 and data[0] == 'EDIT':
 
             try:
@@ -189,9 +194,9 @@ async def import_flights_from_txt(file: UploadFile = File(...),
                                     DepartureAirportID=new_airports_dp.ID)
                 new_schedule = Schedules(Date=data[1],
                                          Time=data[2],
-                                         EconomyPrice=int(data[7]),
+                                         EconomyPrice=float(data[7]),
                                          FlightNumber=data[3],
-                                         Confirmed=int(data[8]),
+                                         Confirmed=data[8],
                                          RouteID=new_routes.ID)
 
                 session.add(new_airports_ar)

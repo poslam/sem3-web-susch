@@ -56,6 +56,7 @@ async def type_required(types: list,  auth: str = Header(None),
 
 async def login_required(auth: str = Header(None),
                          session: AsyncSession = Depends(get_session)):
+    print(1)
     return await type_required([], auth, session)
 
 
@@ -144,7 +145,7 @@ async def login(request: Request,
 
 
 @auth_router.post("/logout")
-async def logout(user: Users = Depends(user_required),
+async def logout(user: Users = Depends(login_required),
                  session: AsyncSession = Depends(get_session)):
 
     await session.execute(
