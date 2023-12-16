@@ -75,65 +75,62 @@ async def flight_search(departure_airport: str = None,
         if schedules_raw:
             sessions.append(schedules_raw._mapping)
 
-    if sessions:
-        return sessions
-    else:
-        return {"detail": "no flight schedules found"}
+    return sessions
 
 
 @flight_router.post("/confirm")
-async def flight_confirm(schedules_id: int,
+async def flight_confirm(flight_id: int,
                          user=Depends(admin_required),
                          session: AsyncSession = Depends(get_session)):
 
-    schedules_for_confirm: Schedules = await session.get(Schedules, schedules_id)
+    schedules_for_confirm: Schedules = await session.get(Schedules, flight_id)
 
     if schedules_for_confirm == None:
-        await exception("schedule not found", 400, user.ID, session)
+        await exception("flight not found", 400, user.ID, session)
 
     if (schedules_for_confirm.Confirmed == 0):
         await session.execute(
             update(Schedules)
-            .where(Schedules.ID == schedules_id)
+            .where(Schedules.ID == flight_id)
             .values(Confirmed=1)
         )
         await session.commit()
-        response = {"detail": "schedule confirmed"}
+        response = {"detail": "flight confirm success"}
     else:
         await session.execute(
             update(Schedules)
-            .where(Schedules.ID == schedules_id)
+            .where(Schedules.ID == flight_id)
             .values(Confirmed=0)
         )
         await session.commit()
-        response = {"detail": "schedule unconfirmed"}
+        response = {"detail": "flight unconfirm success"}
 
     return response
 
 
 @flight_router.put("/edit")
 async def flight_edit(flight_id: int,
-                      new_date: date = None,
-                      new_time: time = None,
-                      new_economy_price: int = None,
+                      date: date = None,
+                      time: time = None,
+                      economy_price: int = None,
                       user=Depends(admin_required),
                       session: AsyncSession = Depends(get_session)):
 
     flight_to_edit: Schedules = await session.get(Schedules, flight_id)
 
     if flight_to_edit is None:
-        await exception("flight schedule not found", 400, user.ID, session)
+        await exception("flight not found", 400, user.ID, session)
 
-    if new_date:
-        flight_to_edit.Date = new_date
-    if new_time:
-        flight_to_edit.Time = new_time
-    if new_economy_price:
-        flight_to_edit.EconomyPrice = new_economy_price
+    if date:
+        flight_to_edit.Date = date
+    if time:
+        flight_to_edit.Time = time
+    if economy_price:
+        flight_to_edit.EconomyPrice = economy_price
 
     await session.commit()
 
-    return {"detail": "flight schedule updated successfully"}
+    return {"detail": "flight edit success"}
 
 
 @flight_router.post("/import")
