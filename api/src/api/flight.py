@@ -3,7 +3,7 @@ from datetime import date, time
 from database.database import get_session
 from database.models import Aircrafts, Airports, Routes, Schedules
 from fastapi import APIRouter, Depends, File, UploadFile
-from sqlalchemy import func, select, update
+from sqlalchemy import desc, func, insert, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
@@ -112,12 +112,12 @@ async def flight_confirm(schedules_id: int,
 
 
 @flight_router.put("/edit")
-async def edit_flight_schedule(flight_id: int,
-                               new_date: date = None,
-                               new_time: time = None,
-                               new_economy_price: int = None,
-                               user=Depends(admin_required),
-                               session: AsyncSession = Depends(get_session)):
+async def flight_edit(flight_id: int,
+                      new_date: date = None,
+                      new_time: time = None,
+                      new_economy_price: int = None,
+                      user=Depends(admin_required),
+                      session: AsyncSession = Depends(get_session)):
 
     flight_to_edit: Schedules = await session.get(Schedules, flight_id)
 
@@ -137,15 +137,14 @@ async def edit_flight_schedule(flight_id: int,
 
 
 @flight_router.post("/import")
-async def import_flights_from_txt(file: UploadFile = File(...),
-                                  session: AsyncSession = Depends(get_session)):
+async def flight_import(file: UploadFile = File(...),
+                        user=Depends(admin_required),
+                        session: AsyncSession = Depends(get_session)):
 
-    file_data = await file.read()
-    decoded_file_data = file_data.decode('utf-8')
-    lines = decoded_file_data.split('\n')
+    lines = (await file.read()).decode('utf-8').split('\n')
+    stmts = []
 
     dubles = 0
-    allowed = 0
     not_allowed = 0
 
     for line in lines:
@@ -157,63 +156,126 @@ async def import_flights_from_txt(file: UploadFile = File(...),
         else:
             data[8] = 0
 
-        if len(data) == 9 and data[0] == 'EDIT':
+        if data[0] == 'EDIT':
 
-            try:
+            schedule_raw = (await session.execute(
+                select(Schedules)
+                .where(Schedules.Date == data[1])
+                .where(Schedules.FlightNumber == data[3])
+            )).first()
 
-                existing_schedule: Schedules = await session.get(Schedules, data[1] & data[3])
-                existing_routes: Routes = await session.get(Routes, existing_schedule.RouteID)
-                existing_ar_airports: Airports = await session.get(Airports, existing_routes.ArrivalAirportID)
-                existing_dp_airports: Airports = await session.get(Airports, existing_routes.DepartureAirportID)
+            if schedule_raw == None:
+                not_allowed += 1
+                continue
 
-                if existing_schedule:
-                    if data[2]:
-                        existing_schedule.Time = data[2]
-                    if data[4]:
-                        existing_dp_airports.IATACode = data[4]
-                    if data[5]:
-                        existing_ar_airports.IATACode = data[5]
-                    if data[6]:
-                        existing_schedule.AircraftID = data[6]
-                    if data[7]:
-                        existing_schedule.EconomyPrice = data[7]
-                    if data[8]:
-                        existing_schedule.Confirmed = data[8]
-                    allowed = allowed + 1
+            schedule: Schedules = schedule_raw[0]
 
-            except IntegrityError:
-                dubles = dubles + 1
+            aircraft = await session.get(Aircrafts, data[6])
 
-        elif len(data) == 9 and data[0] == 'ADD':
+            departure_airport_raw = (await session.execute(
+                select(Airports)
+                .where(Airports.IATACode == data[4])
+            )).first()
 
-            try:
+            arrival_airport_raw = (await session.execute(
+                select(Airports)
+                .where(Airports.IATACode == data[5])
+            )).first()
 
-                new_airports_ar = Airports(IATACode=data[5])
-                new_airports_dp = Airports(IATACode=data[4])
-                new_routes = Routes(ArrivalAirportID=new_airports_ar.ID,
-                                    DepartureAirportID=new_airports_dp.ID)
-                new_schedule = Schedules(Date=data[1],
-                                         Time=data[2],
-                                         EconomyPrice=float(data[7]),
-                                         FlightNumber=data[3],
-                                         Confirmed=data[8],
-                                         RouteID=new_routes.ID)
+            if any(x == None for x in [aircraft, departure_airport_raw, arrival_airport_raw]):
+                not_allowed += 1
+                continue
 
-                session.add(new_airports_ar)
-                session.add(new_airports_dp)
-                session.add(new_routes)
-                session.add(new_schedule)
+            departure_airport: Airports = departure_airport_raw[0]
+            arrival_airport: Airports = arrival_airport_raw[0]
 
-                allowed = allowed + 1
+            route_raw = (await session.execute(
+                select(Routes)
+                .where(Routes.DepartureAirportID == departure_airport.ID)
+                .where(Routes.ArrivalAirportID == arrival_airport.ID)
+            )).first()
 
-            except IntegrityError:
-                dubles = dubles + 1
+            if route_raw == None:
+                not_allowed += 1
+                continue
+
+            route: Routes = route_raw[0]
+
+            schedule_ins = {"Date": data[1],
+                            "Time": data[2],
+                            "AircraftID": aircraft.ID,
+                            "RouteID": route.ID,
+                            "FlightNumber": data[3],
+                            "EconomyPrice": float(data[7]),
+                            "Confirmed": data[8]}
+
+            stmts.append(update(Schedules)
+                         .where(Schedules.ID == schedule.ID)
+                         .values(schedule_ins))
+
+        elif data[0] == 'ADD':
+
+            schedule_duble = (await session.execute(
+                select(Schedules)
+                .where(Schedules.Date == data[1])
+                .where(Schedules.FlightNumber == data[3])
+            )).first()
+
+            if schedule_duble != None:
+                dubles += 1
+                continue
+
+            aircraft = await session.get(Aircrafts, data[6])
+
+            departure_airport_raw = (await session.execute(
+                select(Airports)
+                .where(Airports.IATACode == data[4])
+            )).first()
+
+            arrival_airport_raw = (await session.execute(
+                select(Airports)
+                .where(Airports.IATACode == data[5])
+            )).first()
+
+            if any(x == None for x in [aircraft, departure_airport_raw, arrival_airport_raw]):
+                not_allowed += 1
+                continue
+
+            departure_airport: Airports = departure_airport_raw[0]
+            arrival_airport: Airports = arrival_airport_raw[0]
+
+            route_raw = (await session.execute(
+                select(Routes)
+                .where(Routes.DepartureAirportID == departure_airport.ID)
+                .where(Routes.ArrivalAirportID == arrival_airport.ID)
+            )).first()
+
+            if route_raw == None:
+                not_allowed += 1
+                continue
+
+            route: Routes = route_raw[0]
+
+            schedule_ins = {"Date": data[1],
+                            "Time": data[2],
+                            "AircraftID": aircraft.ID,
+                            "RouteID": route.ID,
+                            "FlightNumber": data[3],
+                            "EconomyPrice": float(data[7]),
+                            "Confirmed": data[8]}
+
+            stmts.append(insert(Schedules).values(schedule_ins))
+
         else:
-            not_allowed = not_allowed + 1
+            not_allowed += 1
+
+    if not_allowed > 0:
+        raise exception(
+            f"incorrect import file. number of wrong rows: {not_allowed}")
+
+    for stmt in stmts:
+        await session.execute(stmt)
 
     await session.commit()
-    return {"detail": "Рейсы были успешно импортированы и обработаны.",
-            "Allowed": allowed,
-            "Duplicates": dubles,
-            "Missing Fields": not_allowed
-            }
+
+    return {"detail": "flight import success", "duplicates": dubles}
