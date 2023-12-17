@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from database.database import get_session
-from database.models import Offices, Users
+from database.models import Countries, Offices, Users
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import desc, insert, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,4 +15,13 @@ office_router = APIRouter()
 async def office_view(user=Depends(admin_required),
                       session: AsyncSession = Depends(get_session)):
 
-    return [x[0] for x in (await session.execute(select(Offices))).all()]
+    offices = [x._mapping for x in (await session.execute(
+        select(Offices.ID,
+               Offices.Title,
+               Offices.Phone,
+               Offices.Contact,
+               Countries.Name.label("CountryName"))
+        .where(Offices.CountryID == Countries.ID)
+    )).all()]
+
+    return offices

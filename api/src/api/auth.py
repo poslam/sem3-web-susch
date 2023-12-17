@@ -56,7 +56,6 @@ async def type_required(types: list,  auth: str = Header(None),
 
 async def login_required(auth: str = Header(None),
                          session: AsyncSession = Depends(get_session)):
-    print(1)
     return await type_required([], auth, session)
 
 

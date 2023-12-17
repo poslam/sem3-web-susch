@@ -87,18 +87,19 @@ async def user_view(type: str = None,  # None, admin
         if office_ids != None:
             office_ids_list = [int(id) for id in office_ids.split(',')]
             stmt = stmt.where(Users.OfficeID.in_(office_ids_list))
-            
+
         users_raw = (await session.execute(stmt))
-        
+
         users = []
-        
+
         for user_raw in users_raw:
             user_ = dict(user_raw._mapping)
-            
-            user_["Birthdate"] = (time().date()-user_["Birthdate"]).days // 365.25
-            
+
+            user_["Birthdate"] = (
+                time().date()-user_["Birthdate"]).days // 365.25
+
             users.append(user_)
-            
+
         return users
 
 
@@ -180,7 +181,7 @@ async def user_ban(user_id: int, user=Depends(admin_required),
 async def user_edit(user_id: int,
                     request: Request, user=Depends(admin_required),
                     session: AsyncSession = Depends(get_session)):
-    
+
     try:
         data = await request.json()
 
@@ -195,9 +196,9 @@ async def user_edit(user_id: int,
 
     except:
         await exception("incorrect request", 400, user.ID, session)
-        
+
     user_ = await session.get(Users, user_id)
-    
+
     if user_ == None:
         await exception("user not found", 400, user.ID, session)
 
@@ -212,7 +213,7 @@ async def user_edit(user_id: int,
         await exception("office not found", 400, user.ID, session)
 
     role_db = (await session.execute(select(Roles).where(Roles.Title == role))).first()
-    
+
     if role_db == None:
         await exception("incorrect role. should be User or Administrator", 400, user.ID, session)
 
@@ -225,7 +226,7 @@ async def user_edit(user_id: int,
 
     if birthdate > time():
         await exception("incorrect birthdate", 400, user.ID, session)
-        
+
     user_insert = {
         "Email": email,
         "RoleID": role_db[0].ID,

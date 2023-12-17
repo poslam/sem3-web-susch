@@ -1,25 +1,35 @@
 from database.database import base
-from sqlalchemy import (DATE, TEXT, TIME, TIMESTAMP, Boolean, Column, Float,
-                        ForeignKey, Integer, String)
+from sqlalchemy import (
+    DATE,
+    TEXT,
+    TIME,
+    TIMESTAMP,
+    Boolean,
+    Column,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+)
 
 
 class Roles(base):
     __tablename__ = "roles"
-    
+
     ID = Column(Integer, primary_key=True)
     Title = Column(TEXT)
 
 
 class CabinTypes(base):
     __tablename__ = "cabintypes"
-    
+
     ID = Column(Integer, primary_key=True)
     Name = Column(TEXT)
 
 
 class Countries(base):
     __tablename__ = "countries"
-    
+
     ID = Column(Integer, primary_key=True)
     Name = Column(TEXT)
 
@@ -56,23 +66,23 @@ class Users(base):
 
 class Logs(base):
     __tablename__ = "logs"
-    
+
     ID = Column(Integer, primary_key=True)
-    
+
     Error = Column(TEXT)
     UserID = Column(ForeignKey(Users.ID))
     Time = Column(TIMESTAMP)
-    
+
 
 class Tokens(base):
     __tablename__ = "tokens"
-    
+
     ID = Column(Integer, primary_key=True)
     Token = Column(TEXT)
-    
+
     CreateTime = Column(TIMESTAMP)
     DeletionTime = Column(TIMESTAMP)
-    
+
     Active = Column(Boolean)
     UserID = Column(ForeignKey(Users.ID))
 
