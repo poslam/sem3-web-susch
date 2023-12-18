@@ -1,0 +1,1 @@
+docker compose cp ./api api:.
