@@ -32,4 +32,6 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           password: ${{ secrets.SERVER_PASS }}
           port: 22
-          script: docker compose cp ./api api:.
+          script: |
+            cd /home/poslam/web-susch
+            docker compose up --build -d
