@@ -15,15 +15,6 @@ jobs:
     steps:
       - name: 🚚 Get latest code
         uses: actions/checkout@v3
-        
-      - name: 📂 Sync files
-        uses: garygrossgarten/github-action-scp@release
-        with:
-          host: ${{ secrets.SERVER_IP }}
-          username: ${{ secrets.SERVER_USER }}
-          password: ${{ secrets.SERVER_PASS }}
-          remote: /home/poslam/web-susch/
-          local: /home/runner/work/web-susch
       
       - name: 🚀 Deploy
         uses: appleboy/ssh-action@v1.0.0
@@ -34,4 +25,5 @@ jobs:
           port: 22
           script: |
             cd /home/poslam/web-susch
+            git pull
             docker compose up --build -d
