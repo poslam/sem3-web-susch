@@ -19,7 +19,7 @@ api_router.include_router(flight_router, prefix="/flight")
 async def server_status(session: AsyncSession = Depends(get_session)):
     try:
         await session.execute(select(Users))
-        return {"detail": "server and database down зшяф"}
+        return {"detail": "server and database are working!"}
     except Exception as e:
         print(e)
         return {"detail": "connection to the database is corrupted"}
