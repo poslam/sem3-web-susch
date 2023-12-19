@@ -144,7 +144,7 @@ async def login(request: Request,
 
 
 @auth_router.post("/logout")
-async def logout(user: Users = Depends(user_required),
+async def logout(user: Users = Depends(login_required),
                  session: AsyncSession = Depends(get_session)):
 
     await session.execute(

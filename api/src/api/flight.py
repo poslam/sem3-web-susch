@@ -1,16 +1,186 @@
-from datetime import date, time
+from datetime import date, datetime, time, timedelta
 
 from database.database import get_session
 from database.models import Aircrafts, Airports, Routes, Schedules
 from fastapi import APIRouter, Depends, File, UploadFile
-from sqlalchemy import func, select, update
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy import func, insert, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
-from src.api.auth import admin_required
+from src.api.auth import admin_required, login_required
 from src.utils import exception
 
 flight_router = APIRouter()
+
+max_transfers = 2
+
+
+@flight_router.get("/view")
+async def flight_view(departure_airport_code: str,
+                      arrival_airport_code: str,
+                      date_to: date,
+                      date_from: date = None,
+                      mode: str = "to",  # to, to-from
+                      user=Depends(login_required),
+                      session: AsyncSession = Depends(get_session)):
+
+    result = {"to": [], "from": []}
+
+    departure_airport_raw = (await session.execute(
+        select(Airports)
+        .where(Airports.IATACode == departure_airport_code)
+    )).first()
+
+    arrival_airport_raw = (await session.execute(
+        select(Airports)
+        .where(Airports.IATACode == arrival_airport_code)
+    )).first()
+
+    departure_airport: Airports = departure_airport_raw[0]
+    arrival_airport: Airports = arrival_airport_raw[0]
+
+    if any(x == None for x in [departure_airport, arrival_airport]):
+        await exception("aiport not found", 400, user.ID, session)
+
+    airports = [x[0].ID for x in (await session.execute(select(Airports))).all()]
+
+    # routes: list[Routes] = [x[0] for x in (await session.execute(select(Routes))).all()]
+
+    schedules: list[Schedules] = [x[0] for x in (await session.execute(
+        select(Schedules).where(Schedules.Date == date_to)
+    )).all()]
+
+    schedules_next: list[Schedules] = [x[0] for x in (await session.execute(
+        select(Schedules)
+        .where(Schedules.Date >= date_to)
+        .where(Schedules.Date <= date_to + timedelta(days=2))
+    )).all()]
+
+    airports.remove(departure_airport.ID)
+    airports.remove(arrival_airport.ID)
+
+    start = departure_airport.ID
+    end = arrival_airport.ID
+
+    for schedule in schedules:
+
+        route = await session.get(Routes, schedule.RouteID)
+
+        if route.DepartureAirportID == start and route.ArrivalAirportID == end:
+            result["to"].append(
+                {
+                    "From": departure_airport.IATACode,
+                    "To": arrival_airport.IATACode,
+                    "Date": date_to,
+                    "Time": schedule.Time,
+                    "FlightNumbers": [schedule.FlightNumber],
+                    "EconomyPrice": schedule.EconomyPrice,
+                    "BusinessPrice": round(schedule.EconomyPrice*1.35, 4),
+                    "FirstClassPrice": round(schedule.EconomyPrice*1.35*1.3, 4),
+                    "Stops": 0,
+                    "ScheduleIds": [schedule.ID]
+                }
+            )
+
+        for airport in airports:
+
+            for schedule_next in schedules_next:
+
+                if schedule_next.Time <= (datetime.combine(date(1, 1, 1), schedule.Time)
+                                          + timedelta(minutes=route.FlightTime)).time():
+                    continue
+
+                route1 = await session.get(Routes, schedule_next.RouteID)
+
+                if route.DepartureAirportID == start and \
+                    route.ArrivalAirportID == airport and \
+                        route1.DepartureAirportID == airport and \
+                    route1.ArrivalAirportID == end:
+
+                    result["to"].append(
+                        {
+                            "From": departure_airport.IATACode,
+                            "To": arrival_airport.IATACode,
+                            "Date": date_to,
+                            "Time": schedule.Time,
+                            "FlightNumbers": [schedule.FlightNumber,
+                                              schedule_next.FlightNumber],
+                            "EconomyPrice": schedule.EconomyPrice + schedule_next.EconomyPrice,
+                            "BusinessPrice": round((schedule.EconomyPrice + schedule_next.EconomyPrice)*1.35, 4),
+                            "FirstClassPrice": round((schedule.EconomyPrice + schedule_next.EconomyPrice)*1.35*1.3, 4),
+                            "Stops": 1,
+                            "ScheduleIds": [schedule.ID, schedule_next.ID]
+                        }
+                    )
+
+    if mode == "to-from":
+
+        if date_from == None:
+            await exception("date_from is needed", 400, user.ID, session)
+
+        start, end = end, start
+
+        schedules: list[Schedules] = [x[0] for x in (await session.execute(
+            select(Schedules).where(Schedules.Date == date_from)
+        )).all()]
+
+        schedules_next: list[Schedules] = [x[0] for x in (await session.execute(
+            select(Schedules)
+            .where(Schedules.Date >= date_from)
+            .where(Schedules.Date <= date_from + timedelta(days=2))
+        )).all()]
+
+        for schedule in schedules:
+
+            route = await session.get(Routes, schedule.RouteID)
+
+            if route.DepartureAirportID == start and route.ArrivalAirportID == end:
+                result["from"].append(
+                    {
+                        "From": departure_airport.IATACode,
+                        "To": arrival_airport.IATACode,
+                        "Date": date_from,
+                        "Time": schedule.Time,
+                        "FlightNumbers": [schedule.FlightNumber],
+                        "EconomyPrice": schedule.EconomyPrice,
+                        "BusinessPrice": round(schedule.EconomyPrice*1.35, 4),
+                        "FirstClassPrice": round(schedule.EconomyPrice*1.35*1.3, 4),
+                        "Stops": 0,
+                        "ScheduleIds": [schedule.ID]
+                    }
+                )
+
+            for airport in airports:
+
+                for schedule_next in schedules_next:
+
+                    if schedule_next.Time <= (datetime.combine(date(1, 1, 1), schedule.Time)
+                                              + timedelta(minutes=route.FlightTime)).time():
+                        continue
+
+                    route1 = await session.get(Routes, schedule_next.RouteID)
+
+                    if route.DepartureAirportID == start and \
+                        route.ArrivalAirportID == airport and \
+                            route1.DepartureAirportID == airport and \
+                        route1.ArrivalAirportID == end:
+
+                        result["from"].append(
+                            {
+                                "From": departure_airport.IATACode,
+                                "To": arrival_airport.IATACode,
+                                "Date": date_from,
+                                "Time": schedule.Time,
+                                "FlightNumbers": [schedule.FlightNumber,
+                                                  schedule_next.FlightNumber],
+                                "EconomyPrice": schedule.EconomyPrice + schedule_next.EconomyPrice,
+                                "BusinessPrice": round((schedule.EconomyPrice + schedule_next.EconomyPrice)*1.35, 4),
+                                "FirstClassPrice": round((schedule.EconomyPrice + schedule_next.EconomyPrice)*1.35*1.3, 4),
+                                "Stops": 1,
+                                "ScheduleIds": [schedule.ID, schedule_next.ID]
+                            }
+                        )
+
+    return result
 
 
 @flight_router.get("/search")
@@ -41,8 +211,7 @@ async def flight_search(departure_airport: str = None,
                    ).where(Schedules.AircraftID == Aircrafts.ID)
             .where(Schedules.RouteID == Routes.ID)
             .where(Routes.DepartureAirportID == departure.ID)
-            .where(Routes.ArrivalAirportID == arrival.ID)
-            )
+            .where(Routes.ArrivalAirportID == arrival.ID))
 
     if departure_airport != None:
         stmt = (stmt
@@ -75,140 +244,204 @@ async def flight_search(departure_airport: str = None,
         if schedules_raw:
             sessions.append(schedules_raw._mapping)
 
-    if sessions:
-        return sessions
-    else:
-        return {"detail": "no flight schedules found"}
+    return sessions
 
 
 @flight_router.post("/confirm")
-async def flight_confirm(schedules_id: int,
+async def flight_confirm(flight_id: int,
                          user=Depends(admin_required),
                          session: AsyncSession = Depends(get_session)):
 
-    schedules_for_confirm: Schedules = await session.get(Schedules, schedules_id)
+    schedules_for_confirm: Schedules = await session.get(Schedules, flight_id)
 
     if schedules_for_confirm == None:
-        await exception("schedule not found", 400, user.ID, session)
+        await exception("flight not found", 400, user.ID, session)
 
     if (schedules_for_confirm.Confirmed == 0):
         await session.execute(
             update(Schedules)
-            .where(Schedules.ID == schedules_id)
+            .where(Schedules.ID == flight_id)
             .values(Confirmed=1)
         )
         await session.commit()
-        response = {"detail": "schedule confirmed"}
+        response = {"detail": "flight confirm success"}
     else:
         await session.execute(
             update(Schedules)
-            .where(Schedules.ID == schedules_id)
+            .where(Schedules.ID == flight_id)
             .values(Confirmed=0)
         )
         await session.commit()
-        response = {"detail": "schedule unconfirmed"}
+        response = {"detail": "flight unconfirm success"}
 
     return response
 
 
-@flight_router.put("/edit")
-async def edit_flight_schedule(flight_id: int,
-                               new_date: date = None,
-                               new_time: time = None,
-                               new_economy_price: int = None,
-                               user=Depends(admin_required),
-                               session: AsyncSession = Depends(get_session)):
+@flight_router.post("/edit")
+async def flight_edit(flight_id: int,
+                      date: date = None,
+                      time: time = None,
+                      economy_price: int = None,
+                      user=Depends(admin_required),
+                      session: AsyncSession = Depends(get_session)):
 
     flight_to_edit: Schedules = await session.get(Schedules, flight_id)
 
     if flight_to_edit is None:
-        await exception("flight schedule not found", 400, user.ID, session)
+        await exception("flight not found", 400, user.ID, session)
 
-    if new_date:
-        flight_to_edit.Date = new_date
-    if new_time:
-        flight_to_edit.Time = new_time
-    if new_economy_price:
-        flight_to_edit.EconomyPrice = new_economy_price
+    if date:
+        flight_to_edit.Date = date
+    if time:
+        flight_to_edit.Time = time
+    if economy_price:
+        flight_to_edit.EconomyPrice = economy_price
 
     await session.commit()
 
-    return {"detail": "flight schedule updated successfully"}
+    return {"detail": "flight edit success"}
 
 
 @flight_router.post("/import")
-async def import_flights_from_txt(file: UploadFile = File(...),
-                                  session: AsyncSession = Depends(get_session)):
+async def flight_import(file: UploadFile = File(...),
+                        user=Depends(admin_required),
+                        session: AsyncSession = Depends(get_session)):
 
-    file_data = await file.read()
-    decoded_file_data = file_data.decode('utf-8')
-    lines = decoded_file_data.split('\n')
+    lines = (await file.read()).decode('utf-8').split('\n')
+    stmts = []
 
     dubles = 0
-    allowed = 0
     not_allowed = 0
 
     for line in lines:
 
         data = line.split(',')
 
-        if len(data) == 9 and data[0] == 'EDIT':
-
-            try:
-
-                existing_schedule: Schedules = await session.get(Schedules, data[1] & data[3])
-                existing_routes: Routes = await session.get(Routes, existing_schedule.RouteID)
-                existing_ar_airports: Airports = await session.get(Airports, existing_routes.ArrivalAirportID)
-                existing_dp_airports: Airports = await session.get(Airports, existing_routes.DepartureAirportID)
-
-                if existing_schedule:
-                    if data[2]:
-                        existing_schedule.Time = data[2]
-                    if data[4]:
-                        existing_dp_airports.IATACode = data[4]
-                    if data[5]:
-                        existing_ar_airports.IATACode = data[5]
-                    if data[6]:
-                        existing_schedule.AircraftID = data[6]
-                    if data[7]:
-                        existing_schedule.EconomyPrice = data[7]
-                    if data[8]:
-                        existing_schedule.Confirmed = data[8]
-                    allowed = allowed + 1
-
-            except IntegrityError:
-                dubles = dubles + 1
-
-        elif len(data) == 9 and data[0] == 'ADD':
-
-            try:
-
-                new_airports_ar = Airports(IATACode=data[5])
-                new_airports_dp = Airports(IATACode=data[4])
-                new_routes = Routes(ArrivalAirportID=new_airports_ar.ID,
-                                    DepartureAirportID=new_airports_dp.ID)
-                new_schedule = Schedules(Date=data[1],
-                                         Time=data[2],
-                                         EconomyPrice=int(data[7]),
-                                         FlightNumber=data[3],
-                                         Confirmed=int(data[8]),
-                                         RouteID=new_routes.ID)
-
-                session.add(new_airports_ar)
-                session.add(new_airports_dp)
-                session.add(new_routes)
-                session.add(new_schedule)
-
-                allowed = allowed + 1
-
-            except IntegrityError:
-                dubles = dubles + 1
+        if "OK" in data[8]:
+            data[8] = 1
         else:
-            not_allowed = not_allowed + 1
+            data[8] = 0
+
+        if data[0] == 'EDIT':
+
+            schedule_raw = (await session.execute(
+                select(Schedules)
+                .where(Schedules.Date == data[1])
+                .where(Schedules.FlightNumber == data[3])
+            )).first()
+
+            if schedule_raw == None:
+                not_allowed += 1
+                continue
+
+            schedule: Schedules = schedule_raw[0]
+
+            aircraft = await session.get(Aircrafts, data[6])
+
+            departure_airport_raw = (await session.execute(
+                select(Airports)
+                .where(Airports.IATACode == data[4])
+            )).first()
+
+            arrival_airport_raw = (await session.execute(
+                select(Airports)
+                .where(Airports.IATACode == data[5])
+            )).first()
+
+            if any(x == None for x in [aircraft, departure_airport_raw, arrival_airport_raw]):
+                not_allowed += 1
+                continue
+
+            departure_airport: Airports = departure_airport_raw[0]
+            arrival_airport: Airports = arrival_airport_raw[0]
+
+            route_raw = (await session.execute(
+                select(Routes)
+                .where(Routes.DepartureAirportID == departure_airport.ID)
+                .where(Routes.ArrivalAirportID == arrival_airport.ID)
+            )).first()
+
+            if route_raw == None:
+                not_allowed += 1
+                continue
+
+            route: Routes = route_raw[0]
+
+            schedule_ins = {"Date": data[1],
+                            "Time": data[2],
+                            "AircraftID": aircraft.ID,
+                            "RouteID": route.ID,
+                            "FlightNumber": data[3],
+                            "EconomyPrice": float(data[7]),
+                            "Confirmed": data[8]}
+
+            stmts.append(update(Schedules)
+                         .where(Schedules.ID == schedule.ID)
+                         .values(schedule_ins))
+
+        elif data[0] == 'ADD':
+
+            schedule_duble = (await session.execute(
+                select(Schedules)
+                .where(Schedules.Date == data[1])
+                .where(Schedules.FlightNumber == data[3])
+            )).first()
+
+            if schedule_duble != None:
+                dubles += 1
+                continue
+
+            aircraft = await session.get(Aircrafts, data[6])
+
+            departure_airport_raw = (await session.execute(
+                select(Airports)
+                .where(Airports.IATACode == data[4])
+            )).first()
+
+            arrival_airport_raw = (await session.execute(
+                select(Airports)
+                .where(Airports.IATACode == data[5])
+            )).first()
+
+            if any(x == None for x in [aircraft, departure_airport_raw, arrival_airport_raw]):
+                not_allowed += 1
+                continue
+
+            departure_airport: Airports = departure_airport_raw[0]
+            arrival_airport: Airports = arrival_airport_raw[0]
+
+            route_raw = (await session.execute(
+                select(Routes)
+                .where(Routes.DepartureAirportID == departure_airport.ID)
+                .where(Routes.ArrivalAirportID == arrival_airport.ID)
+            )).first()
+
+            if route_raw == None:
+                not_allowed += 1
+                continue
+
+            route: Routes = route_raw[0]
+
+            schedule_ins = {"Date": data[1],
+                            "Time": data[2],
+                            "AircraftID": aircraft.ID,
+                            "RouteID": route.ID,
+                            "FlightNumber": data[3],
+                            "EconomyPrice": float(data[7]),
+                            "Confirmed": data[8]}
+
+            stmts.append(insert(Schedules).values(schedule_ins))
+
+        else:
+            not_allowed += 1
+
+    if not_allowed > 0:
+        await exception(
+            f"incorrect import file. number of wrong rows: {not_allowed}")
+
+    for stmt in stmts:
+        await session.execute(stmt)
 
     await session.commit()
-    return {"detail": "Рейсы были успешно импортированы и обработаны.",
-            "Allowed": allowed,
-            "Duplicates": dubles,
-            "Missing Fields": not_allowed
-            }
+
+    return {"detail": "flight import success", "duplicates": dubles}
