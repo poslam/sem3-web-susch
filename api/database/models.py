@@ -1,16 +1,6 @@
 from database.database import base
-from sqlalchemy import (
-    DATE,
-    TEXT,
-    TIME,
-    TIMESTAMP,
-    Boolean,
-    Column,
-    Float,
-    ForeignKey,
-    Integer,
-    String,
-)
+from sqlalchemy import (DATE, TEXT, TIME, TIMESTAMP, Boolean, Column, Float,
+                        ForeignKey, Integer, String)
 
 
 class Roles(base):
