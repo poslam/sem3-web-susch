@@ -10,7 +10,7 @@ base = declarative_base()
 
 metadata = base.metadata
 
-engine = create_async_engine(DATABASE_URL)
+engine = create_async_engine(DATABASE_URL, pool_timeout=10000, pool_recycle=299)
 async_session_maker = sessionmaker(
     engine, class_=AsyncSession, expire_on_commit=False)
 
