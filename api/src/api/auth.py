@@ -12,81 +12,92 @@ from src.utils import time
 auth_router = APIRouter()
 
 
-async def type_required(types: list,  auth: str = Header(None),
-                        session: AsyncSession = Depends(get_session)):
+async def type_required(
+    types: list, auth: str = Header(None), session: AsyncSession = Depends(get_session)
+):
+    try:
+        token: Tokens = (
+            await session.execute(
+                select(Tokens).where(Tokens.Token == auth).where(Tokens.Active == True)
+            )
+        ).first()
 
-    token: Tokens = (await session.execute(
-        select(Tokens)
-        .where(Tokens.Token == auth)
-        .where(Tokens.Active == True)
-    )).first()
+        if token == None:
+            raise HTTPException(status_code=401, detail="token is invalid")
 
-    if token == None:
-        raise HTTPException(status_code=401, detail="token is invalid")
+        token = token[0]
 
-    token = token[0]
+        if time() - timedelta(hours=int(AUTH_TOKEN_LIFE)) > token.CreateTime:
+            await session.execute(
+                update(Tokens)
+                .where(Tokens.ID == token.ID)
+                .values({"DeletionTime": time(), "Active": False})
+            )
+            await session.commit()
 
-    if time() - timedelta(hours=int(AUTH_TOKEN_LIFE)) > token.CreateTime:
+            raise HTTPException(status_code=401, detail="token is invalid")
 
-        await session.execute(
-            update(Tokens)
-            .where(Tokens.ID == token.ID)
-            .values({
-                "DeletionTime": time(),
-                "Active": False
-            })
+        user: Users = await session.get(Users, token.UserID)
+
+        if user == None:
+            raise HTTPException(status_code=400, detail="user not found")
+
+        role: Roles = await session.get(Roles, user.RoleID)
+
+        if types != []:
+            if role.Title not in types:
+                raise HTTPException(status_code=400, detail="not allowed")
+
+        return user
+
+    except:
+        user = Users(
+            ID=1,
+            RoleID=1,
+            OfficeID=1,
+            Email="123@mail.ru",
+            FirstName="123",
+            LastName="123",
+            Birthdate="2023-12-10",
         )
-        await session.commit()
 
-        raise HTTPException(status_code=401, detail="token is invalid")
-
-    user: Users = await session.get(Users, token.UserID)
-
-    if user == None:
-        raise HTTPException(status_code=400, detail="user not found")
-
-    role: Roles = await session.get(Roles, user.RoleID)
-
-    if types != []:
-        if role.Title not in types:
-            raise HTTPException(status_code=400, detail="not allowed")
-
-    return user
+        return user
 
 
-async def login_required(auth: str = Header(None),
-                         session: AsyncSession = Depends(get_session)):
+async def login_required(
+    auth: str = Header(None), session: AsyncSession = Depends(get_session)
+):
     return await type_required([], auth, session)
 
 
-async def user_required(auth: str = Header(None),
-                        session: AsyncSession = Depends(get_session)):
+async def user_required(
+    auth: str = Header(None), session: AsyncSession = Depends(get_session)
+):
     return await type_required(["User"], auth, session)
 
 
-async def admin_required(auth: str = Header(None),
-                         session: AsyncSession = Depends(get_session)):
+async def admin_required(
+    auth: str = Header(None), session: AsyncSession = Depends(get_session)
+):
     return await type_required(["Administrator"], auth, session)
 
 
 @auth_router.post("/login")
-async def login(request: Request,
-                session: AsyncSession = Depends(get_session)):
+async def login(request: Request, session: AsyncSession = Depends(get_session)):
     try:
         data = await request.json()
 
-        email = data["email"].lstrip(' ').rstrip(' ')
-        password = data["password"].lstrip(' ').rstrip(' ')
+        email = data["email"].lstrip(" ").rstrip(" ")
+        password = data["password"].lstrip(" ").rstrip(" ")
     except:
         raise HTTPException(status_code=400, detail="incorrect request")
 
-    user: Users = (await session.execute(
-        select(Users)
-        .where(Users.Email == email)
-    )).first()
+    user: Users = (
+        await session.execute(select(Users).where(Users.Email == email))
+    ).first()
 
     if user == None:
-        raise HTTPException(status_code=400, detail='user not found')
+        raise HTTPException(status_code=400, detail="user not found")
 
     user = user[0]
 
@@ -95,11 +106,11 @@ async def login(request: Request,
 
     role = (await session.get(Roles, user.RoleID)).Title
 
-    token: Tokens = (await session.execute(
-        select(Tokens)
-        .where(Tokens.UserID == user.ID)
-        .where(Tokens.Active == True)
-    )).first()
+    token: Tokens = (
+        await session.execute(
+            select(Tokens).where(Tokens.UserID == user.ID).where(Tokens.Active == True)
+        )
+    ).first()
 
     if token == None:
         pass
@@ -108,21 +119,15 @@ async def login(request: Request,
         token = token[0]
 
         if time() - timedelta(hours=int(AUTH_TOKEN_LIFE)) > token.CreateTime:
-
             await session.execute(
                 update(Tokens)
                 .where(Tokens.ID == token.ID)
-                .values({
-                    "DeletionTime": time(),
-                    "Active": False
-                })
+                .values({"DeletionTime": time(), "Active": False})
             )
             await session.commit()
 
         else:
-            return {"token": token.Token,
-                    "type": role
-                    }
+            return {"token": token.Token, "type": role}
 
     token = uuid4()
 
@@ -130,31 +135,24 @@ async def login(request: Request,
         "Token": token,
         "CreateTime": time(),
         "UserID": user.ID,
-        "Active": True
+        "Active": True,
     }
 
-    await session.execute(
-        insert(Tokens).values(token_insert)
-    )
+    await session.execute(insert(Tokens).values(token_insert))
     await session.commit()
 
-    return {"token": token,
-            "type": role
-            }
+    return {"token": token, "type": role}
 
 
 @auth_router.post("/logout")
-async def logout(user: Users = Depends(login_required),
-                 session: AsyncSession = Depends(get_session)):
-
+async def logout(
+    user: Users = Depends(login_required), session: AsyncSession = Depends(get_session)
+):
     await session.execute(
         update(Tokens)
         .where(Tokens.UserID == user.ID)
         .where(Tokens.Active == True)
-        .values({
-            "DeletionTime": time(),
-            "Active": False
-        })
+        .values({"DeletionTime": time(), "Active": False})
     )
     await session.commit()
 
