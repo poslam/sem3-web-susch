@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 
 from database.database import get_session
-from database.models import Logs, Offices, Roles, Tokens, Users
+from database.models import Countries, Logs, Offices, Roles, Tokens, Users
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import desc, insert, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -22,6 +22,7 @@ async def user_view(type: str = None,  # None, admin
     if type == None:
         
         office = await session.get(Offices, user.OfficeID)
+        country = await session.get(Countries, office.CountryID)
         
         time_in_system = timedelta(hours=0)
 
@@ -66,7 +67,7 @@ async def user_view(type: str = None,  # None, admin
             "first_name": user.FirstName,
             "last_name": user.LastName,
             "email": user.Email,
-            "office": office.ID,
+            "office": country.Name,
             "errors": logs,
             "sessions": sessions,
             "time_in_system": time_in_system
