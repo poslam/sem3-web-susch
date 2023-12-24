@@ -20,10 +20,9 @@ async def user_view(type: str = None,  # None, admin
                     session: AsyncSession = Depends(get_session)):
 
     if type == None:
-
-        first_name = user.FirstName
-        last_name = user.LastName
-
+        
+        office = await session.get(Offices, user.OfficeID)
+        
         time_in_system = timedelta(hours=0)
 
         stmt = (select(Tokens.CreateTime, Tokens.DeletionTime, Tokens.Active)
@@ -64,8 +63,10 @@ async def user_view(type: str = None,  # None, admin
         logs = [x[0] for x in (await session.execute(stmt1)).all()]
 
         return {
-            "first_name": first_name,
-            "last_name": last_name,
+            "first_name": user.FirstName,
+            "last_name": user.LastName,
+            "email": user.Email,
+            "office": office.ID,
             "errors": logs,
             "sessions": sessions,
             "time_in_system": time_in_system
