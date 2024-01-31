@@ -22,6 +22,77 @@ from src.utils import exception
 booking_router = APIRouter()
 
 
+@booking_router.get("/view")
+async def booking_view(
+    user=Depends(login_required),
+    session: AsyncSession = Depends(get_session),
+):
+    departure = aliased(Airports, name="arrival")
+    arrival = aliased(Airports, name="departure")
+
+    stmt = (
+        select(
+            Tickets.ID,
+            Tickets.BookingReference,
+            Tickets.Firstname,  #
+            Tickets.Lastname,  #
+            CabinTypes.Name.label("CabinTypeName"),  #
+            Tickets.Phone,  #
+            Schedules.FlightNumber,
+            Schedules.Date,
+            Schedules.Time,
+            departure.IATACode.label("Departue"),
+            arrival.IATACode.label("Arrival"),
+            Routes.FlightTime,
+            Aircrafts.Name.label("Aircraft"),
+        )
+        .where(Tickets.UserID == user.ID)
+        .where(Tickets.CabinTypeID == CabinTypes.ID)
+        .where(Tickets.ScheduleID == Schedules.ID)
+        .where(Schedules.AircraftID == Aircrafts.ID)
+        .where(Schedules.RouteID == Routes.ID)
+        .where(Routes.DepartureAirportID == departure.ID)
+        .where(Routes.ArrivalAirportID == arrival.ID)
+        .order_by(Tickets.BookingReference)
+    )
+
+    result = []
+
+    bookings = []
+
+    tickets_raw = (await session.execute(stmt)).all()
+
+    for ticket_raw in tickets_raw:
+        ticket = ticket_raw._mapping
+
+        if ticket["BookingReference"] not in bookings:
+            bookings.append(ticket["BookingReference"])
+
+            temp = dict(ticket)
+
+            for x in ["Firstname", "Lastname", "CabinTypeName", "Phone"]:
+                temp.pop(x)
+
+            temp["Passengers"] = [
+                {
+                    x: ticket[x]
+                    for x in ["Firstname", "Lastname", "CabinTypeName", "Phone"]
+                }
+            ]
+
+            result.append(temp)
+
+        else:
+            result[-1]["Passengers"].append(
+                {
+                    x: ticket[x]
+                    for x in ["Firstname", "Lastname", "CabinTypeName", "Phone"]
+                }
+            )
+
+    return result
+
+
 @booking_router.get("/check")
 async def booking_check(
     schedule_ids: Union[str, int],  # 1,2,3
@@ -206,7 +277,6 @@ async def booking_confirm(
     user=Depends(login_required),
     session: AsyncSession = Depends(get_session),
 ):
-
     bookings = [
         x[0]
         for x in (
