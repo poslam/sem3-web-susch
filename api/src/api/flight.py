@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 from src.api.auth import admin_required, login_required
 from src.utils import exception
+from src.utils import time as now
 
 flight_router = APIRouter()
 
@@ -532,7 +533,7 @@ async def flight_export(
     try:
         writer = ExcelWriter(f"{EXCEL_PATH}/export.xlsx")
 
-        now = datetime.utcnow()
+        now = now()
         first_sunday, num_days = calendar.monthrange(now.year, now.month)
 
         begin_month = (now - timedelta(days=now.day - 1)).date()

@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from database.database import get_session
 from database.models import Logs
@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 
 def time():
-    return datetime.utcnow()
+    return datetime.utcnow() + timedelta(hours=10)
 
 
 async def exception(
@@ -17,7 +17,6 @@ async def exception(
     user_id: int,
     session: AsyncSession = Depends(get_session),
 ):
-
     try:
         last_id = (
             (await session.execute(select(Logs.ID).order_by(desc(Logs.ID))))

@@ -11,9 +11,8 @@ from database.models import (
     Schedules,
     Tickets,
 )
-from fastapi import APIRouter, Depends, File, Request, UploadFile
-from sqlalchemy import desc, func, insert, select, update
-from sqlalchemy.exc import IntegrityError
+from fastapi import APIRouter, Depends, Request
+from sqlalchemy import func, insert, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 from src.api.auth import login_required
@@ -34,10 +33,10 @@ async def booking_view(
         select(
             Tickets.ID,
             Tickets.BookingReference,
-            Tickets.Firstname,  #
-            Tickets.Lastname,  #
-            CabinTypes.Name.label("CabinTypeName"),  #
-            Tickets.Phone,  #
+            Tickets.Firstname,
+            Tickets.Lastname,
+            CabinTypes.Name.label("CabinTypeName"),
+            Tickets.Phone,
             Schedules.FlightNumber,
             Schedules.Date,
             Schedules.Time,
