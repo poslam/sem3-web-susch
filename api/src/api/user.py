@@ -12,25 +12,25 @@ user_router = APIRouter()
 
 
 @user_router.get("/view")
-async def user_view(type: str = None,  # None, admin
-                    office_ids: str = None,
-                    begin: datetime = None,
-                    end: datetime = None,
-                    user: Users = Depends(user_required),
-                    session: AsyncSession = Depends(get_session)):
-
+async def user_view(
+    type: str = None,  # None, admin
+    office_ids: str = None,
+    begin: datetime = None,
+    end: datetime = None,
+    user: Users = Depends(user_required),
+    session: AsyncSession = Depends(get_session),
+):
     if type == None:
-        
         office = await session.get(Offices, user.OfficeID)
         country = await session.get(Countries, office.CountryID)
-        
+
         time_in_system = timedelta(hours=0)
 
-        stmt = (select(Tokens.CreateTime, Tokens.DeletionTime, Tokens.Active)
-                .where(Tokens.UserID == user.ID))
+        stmt = select(Tokens.CreateTime, Tokens.DeletionTime, Tokens.Active).where(
+            Tokens.UserID == user.ID
+        )
 
-        stmt1 = (select(Logs)
-                 .where(Logs.UserID == user.ID))
+        stmt1 = select(Logs).where(Logs.UserID == user.ID)
 
         if begin != None:
             stmt = stmt.where(Tokens.CreateTime >= begin)
@@ -48,18 +48,19 @@ async def user_view(type: str = None,  # None, admin
             session_ = session_raw._mapping
 
             if not session_["Active"]:
-                session_time = session_[
-                    "DeletionTime"] - session_["CreateTime"]
+                session_time = session_["DeletionTime"] - session_["CreateTime"]
             else:
                 session_time = time() - session_["CreateTime"]
 
             time_in_system += session_time
 
-            sessions.append({
-                "login": session_["CreateTime"],
-                "logout": session_["DeletionTime"],
-                "session_time": session_time
-            })
+            sessions.append(
+                {
+                    "login": session_["CreateTime"],
+                    "logout": session_["DeletionTime"],
+                    "session_time": session_time,
+                }
+            )
 
         logs = [x[0] for x in (await session.execute(stmt1)).all()]
 
@@ -70,35 +71,37 @@ async def user_view(type: str = None,  # None, admin
             "office": country.Name,
             "errors": logs,
             "sessions": sessions,
-            "time_in_system": time_in_system
+            "time_in_system": time_in_system,
         }
 
     elif type == "admin":
-
-        stmt = (select(Users.ID,
-                       Users.FirstName,
-                       Users.LastName,
-                       Users.Email,
-                       Users.Birthdate,
-                       Roles.Title.label("Role"),
-                       Offices.Title.label("Office"),
-                       Users.Active)
-                .where(Users.RoleID == Roles.ID)
-                .where(Users.OfficeID == Offices.ID))
+        stmt = (
+            select(
+                Users.ID,
+                Users.FirstName,
+                Users.LastName,
+                Users.Email,
+                Users.Birthdate,
+                Roles.Title.label("Role"),
+                Offices.Title.label("Office"),
+                Users.Active,
+            )
+            .where(Users.RoleID == Roles.ID)
+            .where(Users.OfficeID == Offices.ID)
+        )
 
         if office_ids != None:
-            office_ids_list = [int(id) for id in office_ids.split(',')]
+            office_ids_list = [int(id) for id in office_ids.split(",")]
             stmt = stmt.where(Users.OfficeID.in_(office_ids_list))
 
-        users_raw = (await session.execute(stmt))
+        users_raw = await session.execute(stmt)
 
         users = []
 
         for user_raw in users_raw:
             user_ = dict(user_raw._mapping)
 
-            user_["Birthdate"] = (
-                time().date()-user_["Birthdate"]).days // 365.25
+            user_["Birthdate"] = (time().date() - user_["Birthdate"]).days // 365.25
 
             users.append(user_)
 
@@ -106,8 +109,11 @@ async def user_view(type: str = None,  # None, admin
 
 
 @user_router.post("/create")
-async def user_create(request: Request, user=Depends(admin_required),
-                      session: AsyncSession = Depends(get_session)):
+async def user_create(
+    request: Request,
+    user=Depends(admin_required),
+    session: AsyncSession = Depends(get_session),
+):
     try:
         data = await request.json()
 
@@ -121,6 +127,12 @@ async def user_create(request: Request, user=Depends(admin_required),
     except:
         await exception("incorrect request", 400, user.ID, session)
 
+    if any(
+        x in [None, ""]
+        for x in [email, password, first_name, last_name, office_id, birthdate]
+    ):
+        await exception("incorrect request", 400, user.ID, session)
+
     user_ = (await session.execute(select(Users).where(Users.Email == email))).first()
 
     if user_ != None:
@@ -132,7 +144,6 @@ async def user_create(request: Request, user=Depends(admin_required),
         await exception("office not found", 400, user.ID, session)
 
     try:
-
         birthdate = datetime.strptime(birthdate, "%Y-%m-%d")
 
     except:
@@ -141,10 +152,14 @@ async def user_create(request: Request, user=Depends(admin_required),
     if birthdate > time():
         await exception("incorrect birthdate", 400, user.ID, session)
 
-    last_id = (await session.execute(select(Users.ID).order_by(desc(Users.ID)))).all()[0]._mapping["ID"]
+    last_id = (
+        (await session.execute(select(Users.ID).order_by(desc(Users.ID))))
+        .all()[0]
+        ._mapping["ID"]
+    )
 
     user_insert = {
-        "ID": last_id+1,
+        "ID": last_id + 1,
         "Email": email,
         "RoleID": 1,
         "Password": password,
@@ -161,29 +176,29 @@ async def user_create(request: Request, user=Depends(admin_required),
 
 
 @user_router.post("/ban")
-async def user_ban(user_id: int, user=Depends(admin_required),
-                   session: AsyncSession = Depends(get_session)):
-
+async def user_ban(
+    user_id: int,
+    user=Depends(admin_required),
+    session: AsyncSession = Depends(get_session),
+):
     user_for_ban: Users = await session.get(Users, user_id)
 
     if user_for_ban == None:
         await exception("user not found", 400, user.ID, session)
 
-    await session.execute(
-        update(Users)
-        .where(Users.ID == user_id)
-        .values(Active=False)
-    )
+    await session.execute(update(Users).where(Users.ID == user_id).values(Active=False))
     await session.commit()
 
     return {"detail": "user ban success"}
 
 
 @user_router.post("/edit")
-async def user_edit(user_id: int,
-                    request: Request, user=Depends(admin_required),
-                    session: AsyncSession = Depends(get_session)):
-
+async def user_edit(
+    user_id: int,
+    request: Request,
+    user=Depends(admin_required),
+    session: AsyncSession = Depends(get_session),
+):
     try:
         data = await request.json()
 
@@ -217,10 +232,11 @@ async def user_edit(user_id: int,
     role_db = (await session.execute(select(Roles).where(Roles.Title == role))).first()
 
     if role_db == None:
-        await exception("incorrect role. should be User or Administrator", 400, user.ID, session)
+        await exception(
+            "incorrect role. should be User or Administrator", 400, user.ID, session
+        )
 
     try:
-
         birthdate = datetime.strptime(birthdate, "%Y-%m-%d")
 
     except:
@@ -237,7 +253,7 @@ async def user_edit(user_id: int,
         "LastName": last_name,
         "OfficeID": office_id,
         "Birthdate": birthdate,
-        "Active": active
+        "Active": active,
     }
 
     await session.execute(update(Users).where(Users.ID == user_id).values(user_insert))

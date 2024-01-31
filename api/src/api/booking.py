@@ -2,8 +2,15 @@ from random import randint
 from typing import Literal, Union
 
 from database.database import get_session
-from database.models import (Aircrafts, Airports, CabinTypes, Countries,
-                             Routes, Schedules, Tickets)
+from database.models import (
+    Aircrafts,
+    Airports,
+    CabinTypes,
+    Countries,
+    Routes,
+    Schedules,
+    Tickets,
+)
 from fastapi import APIRouter, Depends, File, Request, UploadFile
 from sqlalchemy import desc, func, insert, select, update
 from sqlalchemy.exc import IntegrityError
@@ -32,8 +39,7 @@ async def booking_check(
             for x in (
                 await session.execute(
                     select(Schedules).where(
-                        Schedules.ID.in_([int(y)
-                                         for y in schedule_ids.split(",")])
+                        Schedules.ID.in_([int(y) for y in schedule_ids.split(",")])
                     )
                 )
             ).all()
@@ -131,8 +137,7 @@ async def booking_add(
             for x in (
                 await session.execute(
                     select(Schedules).where(
-                        Schedules.ID.in_([int(y)
-                                         for y in schedule_ids.split(",")])
+                        Schedules.ID.in_([int(y) for y in schedule_ids.split(",")])
                     )
                 )
             ).all()
@@ -165,8 +170,7 @@ async def booking_add(
     for passenger in passengers:
         country = (
             await session.execute(
-                select(Countries).where(
-                    Countries.Name == passenger["Country Name"])
+                select(Countries).where(Countries.Name == passenger["Country Name"])
             )
         ).first()
 
@@ -197,22 +201,27 @@ async def booking_add(
 
 
 @booking_router.post("/confirm")
-async def booking_confirm(code: str,
-                          user=Depends(login_required),
-                          session: AsyncSession = Depends(get_session)):
-    
-    bookings = [x[0] for x in (await session.execute(
-        select(Tickets).where(Tickets.BookingReference == code)
-    )).all()]
-    
+async def booking_confirm(
+    code: str,
+    user=Depends(login_required),
+    session: AsyncSession = Depends(get_session),
+):
+
+    bookings = [
+        x[0]
+        for x in (
+            await session.execute(
+                select(Tickets).where(Tickets.BookingReference == code)
+            )
+        ).all()
+    ]
+
     if bookings == []:
         await exception("booking not found", 400, user.ID, session)
-        
+
     await session.execute(
-        update(Tickets)
-        .where(Tickets.BookingReference == code)
-        .values(Confirmed=1)
+        update(Tickets).where(Tickets.BookingReference == code).values(Confirmed=1)
     )
     await session.commit()
-    
+
     return {"detail": "booking confirm success"}

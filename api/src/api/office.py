@@ -12,16 +12,23 @@ office_router = APIRouter()
 
 
 @office_router.get("/view")
-async def office_view(user=Depends(admin_required),
-                      session: AsyncSession = Depends(get_session)):
+async def office_view(
+    user=Depends(admin_required), session: AsyncSession = Depends(get_session)
+):
 
-    offices = [x._mapping for x in (await session.execute(
-        select(Offices.ID,
-               Offices.Title,
-               Offices.Phone,
-               Offices.Contact,
-               Countries.Name.label("CountryName"))
-        .where(Offices.CountryID == Countries.ID)
-    )).all()]
+    offices = [
+        x._mapping
+        for x in (
+            await session.execute(
+                select(
+                    Offices.ID,
+                    Offices.Title,
+                    Offices.Phone,
+                    Offices.Contact,
+                    Countries.Name.label("CountryName"),
+                ).where(Offices.CountryID == Countries.ID)
+            )
+        ).all()
+    ]
 
     return offices

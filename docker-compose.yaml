@@ -32,6 +32,7 @@ services:
             DB_USER: root
             DB_HOST: database
             AUTH_TOKEN_LIFE: 22
+            EXCEL_PATH: /api/src/static
         build: ./api
 
 volumes:

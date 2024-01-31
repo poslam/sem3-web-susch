@@ -9,8 +9,9 @@ country_router = APIRouter()
 
 
 @country_router.get("/view")
-async def country_view(user=Depends(login_required),
-                       session: AsyncSession = Depends(get_session)):
+async def country_view(
+    user=Depends(login_required), session: AsyncSession = Depends(get_session)
+):
 
     countries = [x[0] for x in (await session.execute(select(Countries))).all()]
 

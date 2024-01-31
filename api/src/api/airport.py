@@ -9,15 +9,22 @@ airport_router = APIRouter()
 
 
 @airport_router.get("/view")
-async def airport_view(user=Depends(login_required),
-                       session: AsyncSession = Depends(get_session)):
+async def airport_view(
+    user=Depends(login_required), session: AsyncSession = Depends(get_session)
+):
 
-    airports = [x._mapping for x in (await session.execute(
-        select(Airports.ID,
-               Airports.IATACode,
-               Airports.Name,
-               Countries.Name.label("CountryName"))
-        .where(Airports.CountryID == Countries.ID)
-    )).all()]
+    airports = [
+        x._mapping
+        for x in (
+            await session.execute(
+                select(
+                    Airports.ID,
+                    Airports.IATACode,
+                    Airports.Name,
+                    Countries.Name.label("CountryName"),
+                ).where(Airports.CountryID == Countries.ID)
+            )
+        ).all()
+    ]
 
     return airports

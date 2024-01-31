@@ -52,13 +52,13 @@ async def type_required(
 
     except:
         user = Users(
-            ID=1,
+            ID=9,
             RoleID=1,
             OfficeID=1,
-            Email="123@mail.ru",
-            FirstName="123",
-            LastName="123",
-            Birthdate="2023-12-10",
+            Email="kirden04@mail.ru",
+            FirstName="Denis",
+            LastName="Kirienko",
+            Birthdate="2004-07-04",
         )
 
         return user

@@ -11,3 +11,4 @@ DB_USER = os.environ.get("DB_USER")
 DB_PASS = os.environ.get("DB_PASS")
 
 AUTH_TOKEN_LIFE = os.environ.get("AUTH_TOKEN_LIFE")
+EXCEL_PATH = os.environ.get("EXCEL_PATH")
