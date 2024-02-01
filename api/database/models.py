@@ -2,6 +2,7 @@ from database.database import base
 from sqlalchemy import (
     DATE,
     TEXT,
+    String,
     TIME,
     TIMESTAMP,
     Boolean,
@@ -17,21 +18,21 @@ class Roles(base):
     __tablename__ = "roles"
 
     ID = Column(Integer, primary_key=True)
-    Title = Column(TEXT)
+    Title = Column(String(100))
 
 
 class CabinTypes(base):
     __tablename__ = "cabintypes"
 
     ID = Column(Integer, primary_key=True)
-    Name = Column(TEXT)
+    Name = Column(String(50))
 
 
 class Countries(base):
     __tablename__ = "countries"
 
     ID = Column(Integer, primary_key=True)
-    Name = Column(TEXT)
+    Name = Column(String(100))
 
 
 class Offices(base):
@@ -41,9 +42,9 @@ class Offices(base):
 
     CountryID = Column(ForeignKey(Countries.ID))
 
-    Title = Column(TEXT)
+    Title = Column(String(100))
     Phone = Column(String(20))
-    Contact = Column(TEXT)
+    Contact = Column(String(100))
 
 
 class Users(base):
@@ -54,11 +55,11 @@ class Users(base):
     RoleID = Column(ForeignKey(Roles.ID))
     OfficeID = Column(ForeignKey(Offices.ID))
 
-    Email = Column(TEXT)
-    Password = Column(TEXT)
+    Email = Column(String(50))
+    Password = Column(String(300))
 
-    FirstName = Column(TEXT)
-    LastName = Column(TEXT)
+    FirstName = Column(String(100))
+    LastName = Column(String(100))
     Birthdate = Column(DATE)
 
     Active = Column(Boolean, default=True)
@@ -78,7 +79,7 @@ class Tokens(base):
     __tablename__ = "tokens"
 
     ID = Column(Integer, primary_key=True)
-    Token = Column(TEXT)
+    Token = Column(String(300))
 
     CreateTime = Column(TIMESTAMP)
     DeletionTime = Column(TIMESTAMP)
@@ -94,7 +95,7 @@ class Airports(base):
 
     CountryID = Column(ForeignKey(Countries.ID))
     IATACode = Column(String(20))
-    Name = Column(TEXT)
+    Name = Column(String(200))
 
 
 class Aircrafts(base):
@@ -102,8 +103,8 @@ class Aircrafts(base):
 
     ID = Column(Integer, primary_key=True)
 
-    Name = Column(TEXT)
-    MakeModel = Column(TEXT)
+    Name = Column(String(100))
+    MakeModel = Column(String(300))
 
     TotalSeats = Column(Integer)
     EconomySeats = Column(Integer)
@@ -133,7 +134,7 @@ class Schedules(base):
     AircraftID = Column(ForeignKey(Aircrafts.ID))
     RouteID = Column(ForeignKey(Routes.ID))
 
-    FlightNumber = Column(TEXT)
+    FlightNumber = Column(String(50))
     EconomyPrice = Column(Float)
 
     Confirmed = Column(Integer)
@@ -148,13 +149,13 @@ class Tickets(base):
     ScheduleID = Column(ForeignKey(Schedules.ID))
     CabinTypeID = Column(ForeignKey(CabinTypes.ID))
 
-    Firstname = Column(TEXT)
-    Lastname = Column(TEXT)
+    Firstname = Column(String(100))
+    Lastname = Column(String(100))
 
     Phone = Column(String(20))
-    PassportNumber = Column(TEXT)
+    PassportNumber = Column(String(100))
     PassportCountryID = Column(ForeignKey(Countries.ID))
-    BookingReference = Column(TEXT)
+    BookingReference = Column(String(8))
 
     Confirmed = Column(Integer)
 
@@ -164,7 +165,7 @@ class Amenities(base):
 
     ID = Column(Integer, primary_key=True)
 
-    Service = Column(TEXT)
+    Service = Column(String(200))
     Price = Column(Integer)
 
 
