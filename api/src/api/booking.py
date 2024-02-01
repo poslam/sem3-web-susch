@@ -260,7 +260,7 @@ async def booking_add(
                 "PassportNumber": passenger["Passport number"],
                 "PassportCountryID": country.ID,
                 "BookingReference": code,
-                "Confirmed": 0,
+                "Confirmed": 1,
             }
 
             await session.execute(insert(Tickets).values(ticket))
